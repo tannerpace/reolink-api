@@ -16,7 +16,8 @@ async function main() {
     host,
     username,
     password,
-    debug: false,
+    debug: true,
+    insecure: true, // Allow self-signed certificates
   });
 
   try {
@@ -27,12 +28,20 @@ async function main() {
     console.log(JSON.stringify(devInfo, null, 2));
 
     console.log("\n=== Device Abilities ===");
-    const ability = await getAbility(client);
-    console.log(JSON.stringify(ability, null, 2));
+    try {
+      const ability = await getAbility(client);
+      console.log(JSON.stringify(ability, null, 2));
+    } catch (error: any) {
+      console.log(`Not supported on this device: ${error.detail || error.message}`);
+    }
 
     console.log("\n=== Encoding Configuration (Channel 0) ===");
-    const enc = await getEnc(client, 0);
-    console.log(JSON.stringify(enc, null, 2));
+    try {
+      const enc = await getEnc(client, 0);
+      console.log(JSON.stringify(enc, null, 2));
+    } catch (error: any) {
+      console.log(`Not supported on this device: ${error.detail || error.message}`);
+    }
 
     await client.close();
   } catch (error) {
