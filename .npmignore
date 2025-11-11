@@ -1,0 +1,59 @@
+# NPM ignore file - exclude development files from package
+
+# Source files (only dist/ is published)
+src/
+*.ts
+!*.d.ts
+
+# Tests
+tests/
+*.test.ts
+*.test.js
+*.test.d.ts
+*.test.d.ts.map
+*.test.js.map
+vitest.config.ts
+.vitest/
+
+# Development
+node_modules/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# CI/CD
+.github/
+
+# Documentation (except what's in files array)
+docs/
+
+# Scripts and tools
+scripts/
+snapshots/
+examples/
+extras/
+
+# Config files
+.eslintrc*
+.prettierrc*
+tsconfig.json
+.gitignore
+.gitattributes
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.*
+
+# Build artifacts
+*.tsbuildinfo
+
+# Test files
+reolink.sh
+patrol-test-config.json

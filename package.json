@@ -1,7 +1,7 @@
 {
   "name": "reolink-api",
-  "version": "1.0.0",
-  "description": "Node.js TypeScript implementation of Reolink API client",
+  "version": "0.1.0",
+  "description": "TypeScript SDK and CLI for Reolink NVR/Camera HTTP API - Control PTZ, snapshots, streams, playback, AI detection, and more",
   "type": "module",
   "main": "./dist/reolink.js",
   "types": "./dist/reolink.d.ts",
@@ -56,6 +56,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "build:clean": "tsc && rm -f dist/**/*.test.* dist/*.test.*",
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
@@ -67,16 +68,41 @@
     "test:coverage": "vitest run --coverage",
     "start": "node dist/cli.js",
     "cli": "npm run build && npm run start",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build:clean"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "USAGE.md"
+  ],
   "keywords": [
     "reolink",
     "nvr",
     "camera",
-    "api"
+    "api",
+    "ptz",
+    "security-camera",
+    "surveillance",
+    "cctv",
+    "ip-camera",
+    "rtsp",
+    "snapshot",
+    "playback",
+    "typescript",
+    "sdk",
+    "cli"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "Jonathan Verhees <jonathan@verhees.uk>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/verheesj/reolink-api.git"
+  },
+  "bugs": {
+    "url": "https://github.com/verheesj/reolink-api/issues"
+  },
+  "homepage": "https://github.com/verheesj/reolink-api#readme",
   "devDependencies": {
     "@types/node": "^20.10.0",
     "@typescript-eslint/eslint-plugin": "^6.15.0",
