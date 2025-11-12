@@ -21,9 +21,9 @@ export interface PtzPresetResponse {
 
 export interface PtzCtrlParams {
   channel: number;
-  op: "ToPos" | "Start" | "Stop" | "SetPreset" | "GotoPreset" | "Left" | "Right" | "Up" | "Down" | "ZoomInc" | "ZoomDec" | "FocusInc" | "FocusDec";
+  op: "ToPos" | "Stop" | "Left" | "Right" | "Up" | "Down" | "LeftUp" | "LeftDown" | "RightUp" | "RightDown" | "ZoomInc" | "ZoomDec" | "FocusInc" | "FocusDec" | "IrisDec" | "IrisInc" | "Auto" | "StartPatrol" | "StopPatrol";
   speed?: number;
-  presetId?: number;
+  id?: number; // Preset or patrol ID for ToPos, StartPatrol, StopPatrol operations
   x?: number;
   y?: number;
   z?: number;
@@ -107,6 +107,28 @@ export interface PtzGuardResponse {
 }
 
 /**
+ * PTZ pattern/track configuration (note: API uses "Tattern" spelling)
+ * Track IDs typically range from 1-6 depending on device model
+ */
+export interface PtzTatternTrack {
+  id: number; // Track ID (typically 1-6)
+  name?: string; // Track name
+  enable: number; // 1 = enabled, 0 = disabled
+  [key: string]: unknown;
+}
+
+export interface PtzTattern {
+  channel?: number;
+  track?: PtzTatternTrack[];
+  [key: string]: unknown;
+}
+
+export interface PtzTatternResponse {
+  PtzTattern?: PtzTattern;
+  [key: string]: unknown;
+}
+
+/**
  * Get PTZ presets for a channel
  */
 export async function getPtzPreset(
@@ -126,47 +148,99 @@ export async function getPtzPreset(
 }
 
 /**
- * Set a PTZ preset
+ * Set a PTZ preset at the current camera position
+ * 
+ * Per PTZ.md: SetPtzPreset wraps params in PtzPreset object.
+ * - id: 1-64 (some devices may allow 0)
+ * - name: up to 31 chars
+ * - enable: optional, omit to only rename
+ * 
+ * @throws Error if preset ID is out of range (0-64) or name exceeds 31 characters
  */
 export async function setPtzPreset(
   client: ReolinkClient,
   channel: number,
   id: number,
-  name?: string
+  name?: string,
+  enable?: number
 ): Promise<unknown> {
-  return client.api("SetPtzPreset", {
+  // Validate preset ID range (allow 0-64 for device compatibility)
+  if (id < 0 || id > 64) {
+    throw new Error(`Preset ID must be between 0 and 64, got: ${id}`);
+  }
+
+  // Validate preset name length per API spec
+  const presetName = name || `Preset ${id}`;
+  if (presetName.length > 31) {
+    throw new Error(`Preset name must not exceed 31 characters, got: ${presetName.length}`);
+  }
+
+  const preset: Record<string, unknown> = {
     channel,
     id,
-    name: name || `Preset ${id}`,
+    name: presetName,
+  };
+  
+  // Only include enable if explicitly provided
+  if (enable !== undefined) {
+    preset.enable = enable;
+  }
+
+  return client.api("SetPtzPreset", {
+    PtzPreset: preset,
   });
 }
 
 /**
  * Control PTZ movement
+ * 
+ * Per PTZ.md: PtzCtrl supports operations like Left, Right, Up, Down, ToPos, StartPatrol, StopPatrol, etc.
+ * - For ToPos: requires `id` parameter (preset ID 0-64, spec says 1-64 but some devices allow 0) and optional `speed` (1-64)
+ * - For StartPatrol/StopPatrol: requires `id` parameter (patrol ID 0-5)
+ * - For directional moves (Left, Right, Up, Down, etc.): requires `speed` parameter (1-64)
+ * - Unused params should be set to 0
+ * 
+ * @throws Error if preset/patrol ID or speed is out of valid range
  */
 export async function ptzCtrl(
   client: ReolinkClient,
   params: PtzCtrlParams
 ): Promise<unknown> {
+  // Validate speed range per API spec (1-64)
+  if (params.speed !== undefined && (params.speed < 1 || params.speed > 64)) {
+    throw new Error(`PTZ speed must be between 1 and 64, got: ${params.speed}`);
+  }
+
+  // Validate preset ID for ToPos operation (0-64, allowing 0 for device compatibility)
+  if (params.op === "ToPos" && params.id !== undefined) {
+    if (params.id < 0 || params.id > 64) {
+      throw new Error(`Preset ID must be between 0 and 64, got: ${params.id}`);
+    }
+  }
+
+  // Validate patrol ID for StartPatrol/StopPatrol operations (0-5)
+  if ((params.op === "StartPatrol" || params.op === "StopPatrol") && params.id !== undefined) {
+    if (params.id < 0 || params.id > 5) {
+      throw new Error(`Patrol ID must be between 0 and 5, got: ${params.id}`);
+    }
+  }
+
   const apiParams: Record<string, unknown> = {
     channel: params.channel,
     op: params.op,
   };
 
+  // Add speed if provided
   if (params.speed !== undefined) {
     apiParams.speed = params.speed;
   }
 
-  // GotoPreset operation uses ToPos with cmdStr
-  if (params.op === "GotoPreset" && params.presetId !== undefined) {
-    apiParams.op = "ToPos";
-    apiParams.cmdStr = `ToPos=${params.presetId}`;
-  } else if (params.op === "SetPreset") {
-    if (params.presetId !== undefined) {
-      apiParams.id = params.presetId;
-    }
+  // Add id for ToPos (preset) or StartPatrol/StopPatrol operations
+  if (params.id !== undefined && (params.op === "ToPos" || params.op === "StartPatrol" || params.op === "StopPatrol")) {
+    apiParams.id = params.id;
   }
 
+  // Add x, y, z for absolute positioning (if supported)
   if (params.op === "ToPos" && params.x !== undefined && params.y !== undefined) {
     apiParams.x = params.x;
     apiParams.y = params.y;
@@ -328,12 +402,46 @@ export async function getPtzPatrol(
  * Set PTZ patrol configuration
  * @param channel - Camera channel number (0-based)
  * @param config - Patrol configuration object (RLC-823A/S1 format with points, or legacy format)
+ * @throws Error if patrol ID is out of range (0-5), preset array exceeds 16 steps, or preset IDs/speeds are invalid
  */
 export async function setPtzPatrol(
   client: ReolinkClient,
   channel: number,
   config: PtzPatrolConfig | PtzPatrol
 ): Promise<void> {
+  // Validate patrol ID range per API spec (0-5)
+  if ("id" in config && typeof config.id === "number" && (config.id < 0 || config.id > 5)) {
+    throw new Error(`Patrol ID must be between 0 and 5, got: ${config.id}`);
+  }
+
+  // Validate preset array length and contents
+  const presetArray = config.preset || ("points" in config ? config.points : null) || ("path" in config ? config.path : null);
+  if (Array.isArray(presetArray)) {
+    // Validate max 16 steps per API spec
+    if (presetArray.length > 16) {
+      throw new Error(`Patrol can have at most 16 preset steps, got: ${presetArray.length}`);
+    }
+
+    // Validate each preset step
+    presetArray.forEach((step, index) => {
+      if (typeof step === 'object' && step !== null) {
+        const presetId = 'id' in step ? (step as { id?: number }).id : 
+                        'presetId' in step ? (step as { presetId?: number }).presetId : undefined;
+        const speed = 'speed' in step ? (step as { speed?: number }).speed : undefined;
+
+        // Validate preset ID (0-64, allowing 0 for device compatibility)
+        if (typeof presetId === 'number' && (presetId < 0 || presetId > 64)) {
+          throw new Error(`Patrol step ${index}: preset ID must be between 0 and 64, got: ${presetId}`);
+        }
+
+        // Validate speed (1-64)
+        if (typeof speed === 'number' && (speed < 1 || speed > 64)) {
+          throw new Error(`Patrol step ${index}: speed must be between 1 and 64, got: ${speed}`);
+        }
+      }
+    });
+  }
+
   try {
     // Check if config uses RLC-823A/S1 format (PtzPatrolConfig with preset array)
     // RLC-823A/S1 format: has preset array with id/speed/dwellTime structure, no "name" field
@@ -523,12 +631,18 @@ export async function setPtzPatrol(
  * Start a patrol route
  * @param channel - Camera channel number (0-based)
  * @param patrolId - Patrol route ID (0-5)
+ * @throws Error if patrol ID is out of range (0-5)
  */
 export async function startPatrol(
   client: ReolinkClient,
   channel: number,
   patrolId: number
 ): Promise<void> {
+  // Validate patrol ID range per API spec (0-5)
+  if (patrolId < 0 || patrolId > 5) {
+    throw new Error(`Patrol ID must be between 0 and 5, got: ${patrolId}`);
+  }
+
   try {
     const response = await client.api<ReolinkResponse>("PtzCtrl", {
       channel,
@@ -558,12 +672,18 @@ export async function startPatrol(
  * Stop a patrol route
  * @param channel - Camera channel number (0-based)
  * @param patrolId - Patrol route ID (0-5)
+ * @throws Error if patrol ID is out of range (0-5)
  */
 export async function stopPatrol(
   client: ReolinkClient,
   channel: number,
   patrolId: number
 ): Promise<void> {
+  // Validate patrol ID range per API spec (0-5)
+  if (patrolId < 0 || patrolId > 5) {
+    throw new Error(`Patrol ID must be between 0 and 5, got: ${patrolId}`);
+  }
+
   try {
     const response = await client.api<ReolinkResponse>("PtzCtrl", {
       channel,

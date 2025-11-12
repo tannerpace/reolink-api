@@ -72,10 +72,12 @@ async function main() {
       const firstEnabled = presets.preset.find((p) => p.enable === 1);
       if (firstEnabled) {
         console.log(`Attempting to move to preset ID ${firstEnabled.id}...`);
+        // Per PTZ.md: use ToPos operation with id parameter
         await ptzCtrl(client, {
           channel: CHANNEL,
-          op: "GotoPreset",
-          presetId: firstEnabled.id,
+          op: "ToPos",
+          id: firstEnabled.id,
+          speed: 32, // Optional speed parameter
         });
         console.log(`✓ Moving to preset ${firstEnabled.id} (${firstEnabled.name})...`);
         

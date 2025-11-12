@@ -688,25 +688,34 @@ async function main() {
                 console.error("Error: ptz goto requires a preset ID");
                 process.exit(1);
               }
+              // Per PTZ.md: use ToPos operation with id parameter
               result = await ptzCtrl(client, {
                 channel,
-                op: "GotoPreset",
-                presetId,
+                op: "ToPos",
+                id: presetId,
+                speed: 32, // Default speed
               });
             } else if (subcmd === "start-patrol") {
               if (patrolId === 0) {
                 console.error("Error: ptz start-patrol requires a patrol ID");
                 process.exit(1);
               }
+              // Per PTZ.md: use StartPatrol operation with id parameter
               result = await ptzCtrl(client, {
                 channel,
-                op: "Start",
-                presetId: patrolId,
+                op: "StartPatrol",
+                id: patrolId,
               });
             } else if (subcmd === "stop-patrol") {
+              if (patrolId === 0) {
+                console.error("Error: ptz stop-patrol requires a patrol ID");
+                process.exit(1);
+              }
+              // Per PTZ.md: use StopPatrol operation with id parameter
               result = await ptzCtrl(client, {
                 channel,
-                op: "Stop",
+                op: "StopPatrol",
+                id: patrolId,
               });
             } else {
               console.error(`Error: Unknown ptz subcommand: ${subcmd}`);

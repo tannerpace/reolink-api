@@ -6,36 +6,30 @@ import {
   PresetZones,
 } from "../src/presets.js";
 
-declare global {
-  // eslint-disable-next-line no-var
-  var fetch: typeof fetch;
-}
-
 describe("PresetsModule integration", () => {
-  const loginResponse = {
+  let mockFetch: ReturnType<typeof vi.fn>;
+  let client: ReolinkClient;
+  let module: PresetsModule;
+
+  const createLoginResponse = () => ({
     ok: true,
-    json: async () => [
+    json: vi.fn().mockResolvedValue([
       {
         code: 0,
         value: {
           Token: { name: "token", leaseTime: 3600 },
         },
       },
-    ],
-  } as const;
-
-  let mockFetch: ReturnType<typeof vi.fn>;
-  let client: ReolinkClient;
-  let module: PresetsModule;
+    ]),
+  });
 
   beforeEach(() => {
     mockFetch = vi.fn();
-    // @ts-expect-error assign mock fetch
-    global.fetch = mockFetch;
     client = new ReolinkClient({
       host: "192.168.1.2",
       username: "admin",
       password: "password",
+      fetch: mockFetch as unknown as typeof fetch,
     });
     module = new PresetsModule(client);
   });
@@ -48,7 +42,7 @@ describe("PresetsModule integration", () => {
   it("lists presets via GetPtzPreset action=1", async () => {
     const presetResponse = {
       ok: true,
-      json: async () => [
+      json: vi.fn().mockResolvedValue([
         {
           code: 0,
           value: {
@@ -60,10 +54,10 @@ describe("PresetsModule integration", () => {
             },
           },
         },
-      ],
-    } as const;
+      ]),
+    };
 
-    mockFetch.mockResolvedValueOnce(loginResponse);
+    mockFetch.mockResolvedValueOnce(createLoginResponse());
     mockFetch.mockResolvedValueOnce(presetResponse);
 
     await client.login();
@@ -83,15 +77,15 @@ describe("PresetsModule integration", () => {
   it("sets a preset with enable flag", async () => {
     const response = {
       ok: true,
-      json: async () => [
+      json: vi.fn().mockResolvedValue([
         {
           code: 0,
           value: {},
         },
-      ],
-    } as const;
+      ]),
+    };
 
-    mockFetch.mockResolvedValueOnce(loginResponse);
+    mockFetch.mockResolvedValueOnce(createLoginResponse());
     mockFetch.mockResolvedValueOnce(response);
 
     await client.login();
@@ -112,15 +106,15 @@ describe("PresetsModule integration", () => {
 
     const response = {
       ok: true,
-      json: async () => [
+      json: vi.fn().mockResolvedValue([
         {
           code: 0,
           value: {},
         },
-      ],
-    } as const;
+      ]),
+    };
 
-    mockFetch.mockResolvedValueOnce(loginResponse);
+    mockFetch.mockResolvedValueOnce(createLoginResponse());
     mockFetch.mockResolvedValueOnce(response);
 
     await client.login();
@@ -129,10 +123,11 @@ describe("PresetsModule integration", () => {
     await Promise.resolve();
     const [, requestArgs] = mockFetch.mock.calls[1];
     const body = JSON.parse(String(requestArgs?.body ?? "[]"));
+    // Per PTZ.md: ToPos uses id parameter, not cmdStr
     expect(body[0].param).toMatchObject({
       channel: 0,
       op: "ToPos",
-      cmdStr: "ToPos=3",
+      id: 3,
       speed: 32,
     });
 

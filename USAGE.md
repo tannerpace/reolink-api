@@ -13,7 +13,7 @@ This guide walks through the most common patterns for using the `reolink-api` SD
 Install the published package just like any other npm dependency:
 
 ```bash
-npm install reolink-api
+npm install reolink-nvr-api
 ```
 
 TypeScript type declarations are bundled with the package, so imports are fully typed without any additional configuration.
@@ -23,7 +23,7 @@ TypeScript type declarations are bundled with the package, so imports are fully 
 All programmatic access starts with the `ReolinkClient` class exported from the package root. Construct it with the connection information for your device:
 
 ```typescript
-import { ReolinkClient } from "reolink-api";
+import { ReolinkClient } from "reolink-nvr-api";
 
 const client = new ReolinkClient({
   host: "192.168.1.100",
@@ -76,7 +76,7 @@ Key methods:
 Failed CGI calls throw `ReolinkHttpError`. The error exposes `code`, `rspCode`, and `detail` fields to help you distinguish HTTP issues from device-level failures.
 
 ```typescript
-import { ReolinkClient, ReolinkHttpError } from "reolink-api";
+import { ReolinkClient, ReolinkHttpError } from "reolink-nvr-api";
 
 try {
   await client.api("PlaybackStart", { channel: 0, startTime: "2025-01-01T00:00:00Z" });
@@ -120,7 +120,7 @@ const buffer = await client.snapshotToBuffer(0);        // returns a Node.js Buf
 await client.snapshotToFile("snapshot.jpg", 1);         // saves JPEG to disk
 ```
 
-Behind the scenes the snapshot module reuses the client's credentials, mode, token, and fetch implementation to issue a GET request that returns the raw JPEG binary. The helpers validate the JPEG header to guard against API errors that return HTML or JSON payloads.【F:src/reolink.ts†L340-L388】【F:src/snapshot.ts†L1-L87】
+Behind the scenes the snapshot module reuses the client's credentials, mode, token, and fetch implementation to issue a GET request that returns the raw JPEG binary. The helpers validate the JPEG header to guard against API errors that return HTML or JSON payloads.
 
 ## Playback Control
 
@@ -133,14 +133,14 @@ await playback.seekPlayback(0, "2025-11-10T09:15:00Z");
 await playback.stopPlayback(0);
 ```
 
-The controller validates timestamps, provides friendlier errors for unsupported operations, and exposes `getClient()` for advanced scenarios.【F:src/reolink.ts†L388-L448】【F:src/playback.ts†L1-L200】
+The controller validates timestamps, provides friendlier errors for unsupported operations, and exposes `getClient()` for advanced scenarios.
 
 ## Recording Search and Download
 
 The `record` module wraps `Search` and `Download` CGI commands. Convert ISO timestamps to Unix seconds automatically and work with channel/stream abstractions:
 
 ```typescript
-import { search, download } from "reolink-api/record";
+import { search, download } from "reolink-nvr-api/record";
 
 const results = await search(client, {
   channel: 0,
@@ -154,14 +154,14 @@ for (const file of results.files ?? []) {
 }
 ```
 
-Use `nvrDownload` for NVR-specific download flows; it currently aliases `download` for convenience.【F:src/record.ts†L1-L66】
+Use `nvrDownload` for NVR-specific download flows; it currently aliases `download` for convenience.
 
 ## Streaming URL Helpers
 
 Generate live or playback streaming URLs without memorising the vendor-specific format:
 
 ```typescript
-import { rtspUrl, rtmpUrl, flvUrl, nvrPlaybackFlvUrl } from "reolink-api/stream";
+import { rtspUrl, rtmpUrl, flvUrl, nvrPlaybackFlvUrl } from "reolink-nvr-api/stream";
 
 const rtsp = rtspUrl({ user: "admin", pass: "pass", host: "cam.local", channel: 0, h265: true });
 const rtmp = rtmpUrl({ host: "nvr.local", channel: 0, token: client.getToken(), user: client.getUsername() });
@@ -169,7 +169,7 @@ const flv = flvUrl({ host: "nvr.local", channel: 0, user: "admin", pass: "pass" 
 const playbackFlv = nvrPlaybackFlvUrl({ host: "nvr.local", channel: 0, start: "2025-01-01T09:00:00Z", token: client.getToken() });
 ```
 
-Each helper understands both token-based and user/password authentication and handles channel numbering quirks (e.g., RTSP channels start at `01`).【F:src/stream.ts†L1-L93】
+Each helper understands both token-based and user/password authentication and handles channel numbering quirks (e.g., RTSP channels start at `01`).
 
 ## PTZ Control
 
@@ -181,28 +181,34 @@ import {
   ptzCtrl,
   getPtzGuard,
   setPtzGuard,
+  toggleGuardMode,
   getPtzPatrol,
   setPtzPatrol,
   startPatrol,
   stopPatrol,
-} from "reolink-api/ptz";
+} from "reolink-nvr-api/ptz";
 
 await getPtzPreset(client, 0);
-await ptzCtrl(client, { channel: 0, op: "GotoPreset", presetId: 3 });
+// Go to preset 3
+await ptzCtrl(client, { channel: 0, op: "ToPos", id: 3 });
+// Move left at speed 32
+await ptzCtrl(client, { channel: 0, op: "Left", speed: 32 });
 await setPtzGuard(client, 0, { benable: 1, timeout: 60 });
+// Toggle guard mode on/off
+await toggleGuardMode(client, 0);
 await startPatrol(client, 0, 0);
 ```
 
-The patrol helpers accept both the RLC-823A/S1 preset array format and legacy `points`/`path` payloads, and they normalise error codes into `ReolinkHttpError` instances. Guard helpers automatically include the parameters required by devices that bind guard mode to the current PTZ position.【F:src/ptz.ts†L1-L190】
+The patrol helpers accept both the RLC-823A/S1 preset array format and legacy `points`/`path` payloads, and they normalise error codes into `ReolinkHttpError` instances. Guard helpers automatically include the parameters required by devices that bind guard mode to the current PTZ position.
 
 ## Preset management, zones, and panorama assist
 
 For richer preset workflows—including per-preset motion/AI zones, privacy masks, and optional panorama capture—instantiate the
 `PresetsModule` with an authenticated client. The module wraps every preset-related CGI command, normalises responses, and
-provides helpers for reapplying app-stored zones whenever a preset is recalled.【F:src/presets.ts†L79-L320】【F:src/presets.ts†L322-L449】
+provides helpers for reapplying app-stored zones whenever a preset is recalled.
 
 ```typescript
-import { PresetsModule } from "reolink-api";
+import { PresetsModule } from "reolink-nvr-api";
 
 const presets = new PresetsModule(client);
 
@@ -220,7 +226,7 @@ await presets.applyZonesForPreset(0, 3, {
 ```
 
 When switching presets, retrieve the app-stored zones and hand them back to the helper. It will recall the preset, wait for the
-camera to settle, and then push privacy masks, motion zones, and any supported AI grids in sequence.【F:src/presets.ts†L266-L319】
+camera to settle, and then push privacy masks, motion zones, and any supported AI grids in sequence.
 
 ```typescript
 await presets.gotoPresetWithZones(
@@ -241,8 +247,51 @@ if (state !== 2) {
 }
 ```
 
+Pattern (tattern) operations allow recording and replaying PTZ movements:
+
+```typescript
+// Get all pattern tracks (up to 6 tracks)
+const patterns = await presets.getPattern(0);
+// patterns.value.PtzTattern.track is an array of {id, name, enable}
+
+// Set pattern configuration (track ID must be 1-6)
+await presets.setPattern(0, {
+  PtzTattern: {
+    channel: 0,
+    track: [
+      { id: 1, name: "Sweep", enable: 1 },
+      { id: 2, name: "Guard", enable: 0 }
+    ]
+  }
+});
+```
+
+### Parameter Validation
+
+The library validates all PTZ/preset parameters per the API specification:
+
+- **Preset IDs**: 0-64 (spec says 1-64, but some devices support preset 0 as "Default")
+- **Preset Names**: Maximum 31 characters
+- **Patrol IDs**: 0-5
+- **Patrol Steps**: Maximum 16 steps per patrol route
+- **Pattern Track IDs**: 1-6
+- **PTZ Speed**: 1-64
+
+Validation errors provide clear messages:
+
+```typescript
+// Throws: "Preset ID must be between 0 and 64, got: 99"
+await presets.gotoPreset(0, 99);
+
+// Throws: "Preset name cannot exceed 31 characters"
+await presets.setPreset(0, 1, "This is a very long preset name that exceeds the limit");
+
+// Throws: "PTZ speed must be between 1 and 64, got: 0"
+await ptzCtrl(client, { channel: 0, op: "Left", speed: 0 });
+```
+
 The optional panorama helper reuses the snapshot utilities and returns a buffer you can stitch or save directly. Supply your own
-tiling plan if you want to sweep across a preset while end users edit detection zones.【F:src/presets.ts†L321-L344】
+tiling plan if you want to sweep across a preset while end users edit detection zones.
 
 ```typescript
 const panorama = await presets.buildPanorama(0, { panStep: 15, tiltStep: 10 });
@@ -251,22 +300,22 @@ await fs.promises.writeFile("panorama.jpg", panorama.image as Buffer);
 
 ### Browser-based preset editor example
 
-For teams that prefer a visual workflow, the repository ships with a ready-to-run example server that exposes a browser UI for managing presets, capturing panoramas, and painting motion grids. The script logs into your device, persists per-preset zones on disk, and serves a static web application with a canvas-based editor.【F:examples/preset-visual-editor/server.ts†L1-L247】【F:examples/preset-visual-editor/public/index.html†L1-L76】
+For teams that prefer a visual workflow, the repository ships with a ready-to-run example server that exposes a browser UI for managing presets, capturing panoramas, and painting motion grids. The script logs into your device, persists per-preset zones on disk, and serves a static web application with a canvas-based editor.
 
 ```bash
 npx tsx examples/preset-visual-editor/server.ts
 # open http://localhost:5173 in your browser
 ```
 
-The UI lists the PTZ presets for the selected channel, highlights entries that already have stored zone layouts, and lets you toggle grid cells with the mouse or a touch screen. Buttons along the top recall the preset, clear/fill the grid, and push the edited zones back to the camera. When the device supports panorama capture, the helper button triggers the `buildPanorama` sweep and renders the stitched reference image alongside the zone canvas.【F:examples/preset-visual-editor/public/app.js†L1-L274】【F:examples/preset-visual-editor/public/styles.css†L1-L212】
+The UI lists the PTZ presets for the selected channel, highlights entries that already have stored zone layouts, and lets you toggle grid cells with the mouse or a touch screen. Buttons along the top recall the preset, clear/fill the grid, and push the edited zones back to the camera. When the device supports panorama capture, the helper button triggers the `buildPanorama` sweep and renders the stitched reference image alongside the zone canvas.
 
 ## AI and Alarm Endpoints
 
 Access AI configuration/state and alarm information through dedicated modules:
 
 ```typescript
-import { getAiCfg, getAiState } from "reolink-api/ai";
-import { getAlarm, getMdState } from "reolink-api/alarm";
+import { getAiCfg, getAiState } from "reolink-nvr-api/ai";
+import { getAlarm, getMdState } from "reolink-nvr-api/alarm";
 
 const aiConfig = await getAiCfg(client, 0);
 const aiState = await getAiState(client, 0);
@@ -274,7 +323,7 @@ const alarm = await getAlarm(client);
 const motion = await getMdState(client, 0);
 ```
 
-These helpers call the corresponding CGI commands and return the raw device payloads for inspection or downstream processing.【F:src/ai.ts†L1-L36】【F:src/alarm.ts†L1-L36】
+These helpers call the corresponding CGI commands and return the raw device payloads for inspection or downstream processing.
 
 ## Command-Line Interface
 
@@ -306,25 +355,25 @@ Common global options:
 - `--debug` – log HTTP requests/responses
 - `--json` / `--pretty` – control JSON output formatting
 
-If required configuration is missing, the CLI aborts with a helpful message describing the needed environment variables or flags.【F:src/cli.ts†L1-L132】【F:src/cli.ts†L137-L176】
+If required configuration is missing, the CLI aborts with a helpful message describing the needed environment variables or flags.
 
 ### Command Groups
 
-- `status` – fetch device status (`devinfo`, `ability`, `enc`).【F:src/cli.ts†L41-L60】【F:src/cli.ts†L177-L356】
-- `stream` – build RTSP/RTMP/FLV/playback URLs without running an HTTP request.【F:src/cli.ts†L41-L115】【F:src/cli.ts†L357-L482】
-- `rec` – search and download recordings via the record helpers.【F:src/cli.ts†L16-L60】【F:src/cli.ts†L483-L612】
-- `ptz` – manage presets, guard mode, and patrols.【F:src/cli.ts†L16-L60】【F:src/cli.ts†L613-L800】
-- `ai` / `alarm` – inspect AI configuration/state and motion/alarm information.【F:src/cli.ts†L16-L60】【F:src/cli.ts†L801-L893】
-- `events listen` – stream motion/AI events using the polling emitter.【F:src/cli.ts†L894-L1000】
-- `snap` – capture snapshots to stdout or disk.【F:src/cli.ts†L1001-L1086】
-- `playback` – invoke playback controller operations from the shell.【F:src/cli.ts†L1087-L1244】
-- Generic – pass any CGI command name followed by an optional JSON payload to reach unsupported endpoints directly.【F:src/cli.ts†L1245-L1412】
+- `status` – fetch device status (`devinfo`, `ability`, `enc`).
+- `stream` – build RTSP/RTMP/FLV/playback URLs without running an HTTP request.
+- `rec` – search and download recordings via the record helpers.
+- `ptz` – manage presets, guard mode, and patrols.
+- `ai` / `alarm` – inspect AI configuration/state and motion/alarm information.
+- `events listen` – stream motion/AI events using the polling emitter.
+- `snap` – capture snapshots to stdout or disk.
+- `playback` – invoke playback controller operations from the shell.
+- Generic – pass any CGI command name followed by an optional JSON payload to reach unsupported endpoints directly.
 
 Each command outputs structured JSON by default, which makes it easy to integrate the CLI into scripts. Use `--pretty` for human-readable formatting or redirect binary responses (such as snapshots) to files.
 
 ## Cleaning Up
 
-Always call `client.close()` when you finish interacting with a device. This stops background pollers and logs out cleanly, preventing lingering sessions on the NVR or camera.【F:src/reolink.ts†L305-L338】
+Always call `client.close()` when you finish interacting with a device. This stops background pollers and logs out cleanly, preventing lingering sessions on the NVR or camera.
 
 ## Further Reading
 

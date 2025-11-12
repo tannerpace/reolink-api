@@ -275,8 +275,8 @@ describe("PTZ Guard and Patrol", () => {
         id: 0,
         enable: 1,
         preset: [
-          { id: 0, speed: 32, dwellTime: 10 },
           { id: 1, speed: 32, dwellTime: 10 },
+          { id: 2, speed: 32, dwellTime: 10 },
         ],
       };
 
@@ -291,8 +291,8 @@ describe("PTZ Guard and Patrol", () => {
           id: 0,
           enable: 1,
           preset: [
-            { id: 0, speed: 32, dwellTime: 10 },
             { id: 1, speed: 32, dwellTime: 10 },
+            { id: 2, speed: 32, dwellTime: 10 },
           ],
         },
       });

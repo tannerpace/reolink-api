@@ -70,27 +70,41 @@ npm install reolink-nvr-api
 
 ### Basic Usage
 
+### SDK Usage
+
 ```typescript
-import { ReolinkClient } from "reolink-nvr-api";
+import { ReolinkClient } from 'reolink-nvr-api';
 
 const client = new ReolinkClient({
-  host: "192.168.1.100",
-  username: "admin",
-  password: "your-password",
+  host: '192.168.1.100',
+  username: 'admin',
+  password: 'your-password',
+  mode: 'long' // Token-based session with auto-refresh
 });
 
 await client.login();
 
 // Get device information
-const devInfo = await client.api("GetDevInfo");
-console.log(devInfo);
+const info = await client.getDevInfo();
+console.log('Device:', info.name);
 
 // Capture a snapshot
-const snapshot = await client.snapshotToBuffer(0); // channel 0
-await client.snapshotToFile("snapshot.jpg", 0);
+const jpeg = await client.snap(0); // channel 0
+fs.writeFileSync('snapshot.jpg', Buffer.from(jpeg));
+
+// PTZ control
+await client.ptzCtrl(0, { cmd: 'Right', speed: 32 });
+
+// Get RTSP stream URL
+const rtspUrl = client.rtspUrl(0, { codec: 'h265', streamType: 'main' });
+console.log('Stream:', rtspUrl);
 
 await client.close();
 ```
+
+### CLI Usage
+
+Set environment variables:
 
 ### PTZ Control
 
@@ -393,61 +407,75 @@ export REOLINK_NVR_USER=admin
 export REOLINK_NVR_PASS=your-password
 ```
 
+Then run CLI commands:
+
+```bash
+npx reolink-nvr-api status devinfo
+npx reolink-nvr-api stream url rtsp --channel 0
+npx reolink-nvr-api snap --channel 0 > snapshot.jpg
+```
+
 Or use command-line flags:
 
 ```bash
-node dist/cli.js --host 192.168.1.100 --user admin --pass your-password status devinfo
+npx reolink-nvr-api --host 192.168.1.100 --user admin --pass password status devinfo
 ```
-
-## Documentation
-
-- [Usage guide with detailed SDK and CLI examples](docs/USAGE.md)
 
 ## CLI Commands
 
-### Status Commands
+### Status & Information
 
 ```bash
-# Get device information
-reolink status devinfo
+# Device information
+npx reolink-nvr-api status devinfo
 
-# Get device capabilities
-reolink status ability
+# Device capabilities
+npx reolink-nvr-api status ability
 
-# Get encoding configuration
-reolink status enc --channel 0
+# Encoding configuration
+npx reolink-nvr-api status enc --channel 0
 ```
 
-### Streaming URLs
+### Streaming
 
 ```bash
 # Generate RTSP URL
-reolink stream url rtsp --channel 0 --codec h265
+npx reolink-nvr-api stream url rtsp --channel 0 --codec h265
 
 # Generate RTMP URL
-reolink stream url rtmp --channel 0 --streamType main
+npx reolink-nvr-api stream url rtmp --channel 0 --streamType main
 
 # Generate FLV URL
-reolink stream url flv --channel 0
+npx reolink-nvr-api stream url flv --channel 0
 
-# Generate playback URL
-reolink stream playback --channel 0 --start "2025-01-01T09:00:00Z"
+# Playback stream
+npx reolink-nvr-api stream playback --channel 0 --start "2025-01-01T09:00:00Z"
 ```
 
-### Record Search & Download
+### Snapshots
 
 ```bash
-# Search for recordings
-reolink rec search --channel 0 --start "2025-01-01T00:00:00Z" --end "2025-01-01T23:59:59Z"
+# Capture snapshot to file
+npx reolink-nvr-api snap --channel 0 > snapshot.jpg
 
-# Download a recording
-reolink rec download --channel 0 --file "Mp4Record%202025-01-01_..."
+# Snapshot with debug output
+npx reolink-nvr-api --debug snap --channel 0 > snapshot.jpg
+```
+
+### Recording Management
+
+```bash
+# Search recordings
+npx reolink-nvr-api rec search --channel 0 --start "2025-01-01T00:00:00Z" --end "2025-01-01T23:59:59Z"
+
+# Download recording
+npx reolink-nvr-api rec download --channel 0 --file "Mp4Record%202025-01-01_..."
 ```
 
 ### PTZ Control
 
 ```bash
-# List presets
+# List PTZ presets
 reolink ptz list-presets --channel 0
 
 # Go to preset

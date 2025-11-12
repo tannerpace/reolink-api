@@ -6,15 +6,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ReolinkClient } from "./reolink.js";
 import { ReolinkHttpError } from "./types.js";
 
-// Mock fetch
-global.fetch = vi.fn();
-
 describe("ReolinkClient", () => {
-  const mockFetch = global.fetch as ReturnType<typeof vi.fn>;
+  const mockFetch = vi.fn();
   const mockOptions = {
     host: "192.168.1.100",
     username: "admin",
     password: "password",
+    fetch: mockFetch as unknown as typeof fetch,
   };
 
   beforeEach(() => {
@@ -25,7 +23,7 @@ describe("ReolinkClient", () => {
     it("should login successfully and return token", async () => {
       const mockResponse = {
         ok: true,
-        json: async () => [
+        json: vi.fn().mockResolvedValue([
           {
             code: 0,
             value: {
@@ -35,7 +33,7 @@ describe("ReolinkClient", () => {
               },
             },
           },
-        ],
+        ]),
       };
 
       mockFetch.mockResolvedValueOnce(mockResponse);
@@ -51,7 +49,7 @@ describe("ReolinkClient", () => {
     it("should throw error on login failure", async () => {
       const mockResponse = {
         ok: true,
-        json: async () => [
+        json: vi.fn().mockResolvedValue([
           {
             code: 1,
             error: {
@@ -59,7 +57,7 @@ describe("ReolinkClient", () => {
               detail: "Invalid credentials",
             },
           },
-        ],
+        ]),
       };
 
       mockFetch.mockResolvedValueOnce(mockResponse);
@@ -75,7 +73,7 @@ describe("ReolinkClient", () => {
       // Mock login
       const loginResponse = {
         ok: true,
-        json: async () => [
+        json: vi.fn().mockResolvedValue([
           {
             code: 0,
             value: {
@@ -85,18 +83,18 @@ describe("ReolinkClient", () => {
               },
             },
           },
-        ],
+        ]),
       };
 
       // Mock API call
       const apiResponse = {
         ok: true,
-        json: async () => [
+        json: vi.fn().mockResolvedValue([
           {
             code: 0,
             value: { result: "success" },
           },
-        ],
+        ]),
       };
 
       mockFetch
@@ -113,7 +111,7 @@ describe("ReolinkClient", () => {
     it("should throw ReolinkHttpError on API error", async () => {
       const loginResponse = {
         ok: true,
-        json: async () => [
+        json: vi.fn().mockResolvedValue([
           {
             code: 0,
             value: {
@@ -123,12 +121,12 @@ describe("ReolinkClient", () => {
               },
             },
           },
-        ],
+        ]),
       };
 
       const apiErrorResponse = {
         ok: true,
-        json: async () => [
+        json: vi.fn().mockResolvedValue([
           {
             code: 1,
             error: {
@@ -136,7 +134,7 @@ describe("ReolinkClient", () => {
               detail: "Command not supported",
             },
           },
-        ],
+        ]),
       };
 
       mockFetch
@@ -156,7 +154,7 @@ describe("ReolinkClient", () => {
     it("should logout and close client", async () => {
       const loginResponse = {
         ok: true,
-        json: async () => [
+        json: vi.fn().mockResolvedValue([
           {
             code: 0,
             value: {
@@ -166,12 +164,12 @@ describe("ReolinkClient", () => {
               },
             },
           },
-        ],
+        ]),
       };
 
       const logoutResponse = {
         ok: true,
-        json: async () => [{ code: 0, value: {} }],
+        json: vi.fn().mockResolvedValue([{ code: 0, value: {} }]),
       };
 
       mockFetch
