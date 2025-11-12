@@ -4,6 +4,14 @@
 
 import { ReolinkClient } from "./reolink.js";
 
+/**
+ * Parameters for searching recorded video files
+ * 
+ * @property channel - Camera channel number (0-based)
+ * @property start - Search start time as ISO 8601 timestamp (e.g., "2025-01-01T00:00:00Z")
+ * @property end - Search end time as ISO 8601 timestamp
+ * @property streamType - Stream quality: "main" for high quality, "sub" for lower quality (default: "main")
+ */
 export interface SearchParams {
   channel: number;
   start: string; // ISO 8601 timestamp
@@ -11,6 +19,13 @@ export interface SearchParams {
   streamType?: "main" | "sub";
 }
 
+/**
+ * Information about a recorded video file
+ * 
+ * @property name - File name on the device
+ * @property start - Recording start time
+ * @property end - Recording end time
+ */
 export interface SearchFile {
   name: string;
   start: string;
@@ -18,13 +33,41 @@ export interface SearchFile {
   [key: string]: unknown;
 }
 
+/**
+ * Response from search operation containing list of recordings
+ * 
+ * @property files - Array of found recording files
+ */
 export interface SearchResponse {
   files?: SearchFile[];
   [key: string]: unknown;
 }
 
 /**
- * Search for recorded files
+ * Search for recorded files in a time range
+ * 
+ * Queries the device for video recordings within the specified time window.
+ * Automatically converts ISO 8601 timestamps to Unix timestamps for the API.
+ * 
+ * @param client - An authenticated ReolinkClient instance
+ * @param params - Search parameters
+ * @returns Promise resolving to search results with array of found files
+ * 
+ * @throws {ReolinkHttpError} When the API request fails or returns an error
+ * 
+ * @example
+ * ```typescript
+ * const results = await search(client, {
+ *   channel: 0,
+ *   start: "2025-01-01T00:00:00Z",
+ *   end: "2025-01-01T23:59:59Z",
+ *   streamType: "main"
+ * });
+ * 
+ * for (const file of results.files ?? []) {
+ *   console.log(`Found recording: ${file.name} (${file.start} - ${file.end})`);
+ * }
+ * ```
  */
 export async function search(
   client: ReolinkClient,
@@ -44,6 +87,13 @@ export async function search(
   });
 }
 
+/**
+ * Parameters for downloading a recorded file
+ * 
+ * @property channel - Camera channel number (0-based)
+ * @property fileName - Name of the file to download (from search results)
+ * @property streamType - Stream quality: "main" or "sub" (default: "main")
+ */
 export interface DownloadParams {
   channel: number;
   fileName: string;
@@ -52,7 +102,37 @@ export interface DownloadParams {
 
 /**
  * Download a recorded file
- * Returns the download URL or file data depending on implementation
+ * 
+ * Initiates download of a specific recording file from the device.
+ * Use the search() function first to find available files.
+ * 
+ * Note: The exact behavior depends on the device implementation.
+ * Some devices may return a download URL, while others may stream the file data.
+ * 
+ * @param client - An authenticated ReolinkClient instance
+ * @param params - Download parameters
+ * @returns Promise resolving to download response (URL or file data)
+ * 
+ * @throws {ReolinkHttpError} When the API request fails or returns an error
+ * 
+ * @example
+ * ```typescript
+ * // First, search for recordings
+ * const results = await search(client, {
+ *   channel: 0,
+ *   start: "2025-01-01T00:00:00Z",
+ *   end: "2025-01-01T23:59:59Z"
+ * });
+ * 
+ * // Download the first file found
+ * if (results.files && results.files.length > 0) {
+ *   await download(client, {
+ *     channel: 0,
+ *     fileName: results.files[0].name,
+ *     streamType: "main"
+ *   });
+ * }
+ * ```
  */
 export async function download(
   client: ReolinkClient,
@@ -68,7 +148,23 @@ export async function download(
 }
 
 /**
- * NVR download (if device is an NVR)
+ * NVR-specific download function
+ * 
+ * Alias for download() function. Use this when working with NVR devices
+ * to maintain code clarity about the device type being used.
+ * 
+ * @param client - An authenticated ReolinkClient instance
+ * @param params - Download parameters
+ * @returns Promise resolving to download response
+ * 
+ * @example
+ * ```typescript
+ * await nvrDownload(client, {
+ *   channel: 0,
+ *   fileName: "rec_file.mp4",
+ *   streamType: "main"
+ * });
+ * ```
  */
 export async function nvrDownload(
   client: ReolinkClient,
