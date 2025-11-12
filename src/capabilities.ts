@@ -5,6 +5,14 @@
 import { ReolinkClient } from "./reolink.js";
 import { getAbility } from "./endpoints/system.js";
 
+/**
+ * Device capability flags detected from GetAbility response
+ * 
+ * @property ptz - Pan-Tilt-Zoom control support
+ * @property ai - AI detection support (people, vehicles, pets, etc.)
+ * @property motionDetection - Motion detection support
+ * @property recording - Recording/playback support
+ */
 export interface DeviceCapabilities {
   ptz?: boolean;
   ai?: boolean;
@@ -15,6 +23,24 @@ export interface DeviceCapabilities {
 
 /**
  * Detect device capabilities from GetAbility response
+ * 
+ * Queries the device's GetAbility endpoint and parses the response to determine
+ * which features are supported (PTZ, AI detection, motion detection, recording).
+ * 
+ * The function handles various response formats including both uppercase and lowercase
+ * capability keys (e.g., "Ptz" vs "ptz", "AI" vs "ai"). It also recognizes alternative
+ * keys like "Person" for AI detection.
+ * 
+ * @param client - The authenticated Reolink client
+ * @returns Promise resolving to detected capabilities, or empty object if GetAbility fails
+ * 
+ * @example
+ * ```typescript
+ * const caps = await detectCapabilities(client);
+ * if (caps.ptz) {
+ *   await ptzCtrl(client, { channel: 0, op: "Left", speed: 32 });
+ * }
+ * ```
  */
 export async function detectCapabilities(
   client: ReolinkClient
@@ -77,6 +103,21 @@ export async function detectCapabilities(
 
 /**
  * Guard function to check if a feature is supported before use
+ * 
+ * Throws an error if the specified capability is not present or is falsy.
+ * Use this to enforce feature requirements at runtime and provide clear
+ * error messages when a device lacks expected functionality.
+ * 
+ * @param capabilities - The detected device capabilities
+ * @param feature - The capability key to check
+ * @throws Error if the feature is not supported, listing available capabilities
+ * 
+ * @example
+ * ```typescript
+ * const caps = await detectCapabilities(client);
+ * requireCapability(caps, "ptz"); // throws if PTZ not supported
+ * await ptzCtrl(client, { channel: 0, op: "ToPos", id: 1 });
+ * ```
  */
 export function requireCapability(
   capabilities: DeviceCapabilities,
@@ -91,6 +132,22 @@ export function requireCapability(
 
 /**
  * Helper to get capabilities and check feature support
+ * 
+ * Combines detectCapabilities and feature checking into a single call.
+ * Useful for quick feature checks without needing to store capabilities.
+ * 
+ * @param client - The authenticated Reolink client
+ * @param feature - The capability key to check
+ * @returns Promise resolving to true if feature is supported, false otherwise
+ * 
+ * @example
+ * ```typescript
+ * if (await checkFeature(client, "ptz")) {
+ *   console.log("PTZ control available");
+ * } else {
+ *   console.log("This is a fixed camera");
+ * }
+ * ```
  */
 export async function checkFeature(
   client: ReolinkClient,

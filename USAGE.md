@@ -91,6 +91,40 @@ try {
 
 The playback utilities wrap common "not supported" responses with descriptive messages so that you can fall back to streaming URLs when a device lacks playback control support.【F:src/playback.ts†L1-L116】
 
+## Detecting Device Capabilities
+
+Before invoking feature-specific APIs, you can query the device to determine which capabilities it supports. The `capabilities` module provides helpers to detect and guard against unsupported features:
+
+```typescript
+import { detectCapabilities, requireCapability, checkFeature } from "reolink-nvr-api/capabilities";
+
+// Detect all capabilities at once
+const caps = await detectCapabilities(client);
+console.log("PTZ support:", caps.ptz);
+console.log("AI detection:", caps.ai);
+console.log("Motion detection:", caps.motionDetection);
+console.log("Recording:", caps.recording);
+
+// Guard against missing features
+try {
+  requireCapability(caps, "ptz");
+  // Safe to call PTZ commands
+  await ptzCtrl(client, { channel: 0, op: "Left", speed: 32 });
+} catch (error) {
+  console.error("PTZ not supported on this device");
+}
+
+// Quick feature check
+if (await checkFeature(client, "ai")) {
+  const aiState = await getAiState(client, 0);
+  console.log("AI detection state:", aiState);
+}
+```
+
+The detection logic queries the `GetAbility` endpoint and recognizes various response formats (uppercase/lowercase keys, alternative names like "Person" for AI). If the device doesn't support `GetAbility` or returns an error, `detectCapabilities` returns an empty object rather than throwing.
+
+Use `requireCapability` to enforce feature requirements and provide clear error messages that list the device's available capabilities when a required feature is missing.
+
 ## Monitoring Events
 
 Use `createEventEmitter()` to poll the device for motion and AI detections. The emitter is backed by the `ReolinkEventEmitter` class, which extends Node's `EventEmitter`.

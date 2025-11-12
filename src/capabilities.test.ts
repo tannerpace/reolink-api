@@ -236,6 +236,116 @@ describe("Capabilities", () => {
 
       expect(caps).toEqual({});
     });
+
+    it("should detect motion detection with Motion key", async () => {
+      const abilityResponse = {
+        ok: true,
+        json: vi.fn().mockResolvedValue([
+          {
+            code: 0,
+            value: {
+              Motion: { ver: 1, permit: 7 },
+            },
+          },
+        ]),
+      };
+
+      mockFetch.mockResolvedValueOnce(createLoginResponse());
+      mockFetch.mockResolvedValueOnce(abilityResponse);
+
+      await client.login();
+      const caps = await detectCapabilities(client);
+
+      expect(caps.motionDetection).toBe(true);
+    });
+
+    it("should detect recording with Record key", async () => {
+      const abilityResponse = {
+        ok: true,
+        json: vi.fn().mockResolvedValue([
+          {
+            code: 0,
+            value: {
+              Record: { ver: 1, permit: 7 },
+            },
+          },
+        ]),
+      };
+
+      mockFetch.mockResolvedValueOnce(createLoginResponse());
+      mockFetch.mockResolvedValueOnce(abilityResponse);
+
+      await client.login();
+      const caps = await detectCapabilities(client);
+
+      expect(caps.recording).toBe(true);
+    });
+
+    it("should handle empty ability value", async () => {
+      const abilityResponse = {
+        ok: true,
+        json: vi.fn().mockResolvedValue([
+          {
+            code: 0,
+            value: {},
+          },
+        ]),
+      };
+
+      mockFetch.mockResolvedValueOnce(createLoginResponse());
+      mockFetch.mockResolvedValueOnce(abilityResponse);
+
+      await client.login();
+      const caps = await detectCapabilities(client);
+
+      expect(caps).toEqual({});
+    });
+
+    it("should handle null ability value", async () => {
+      const abilityResponse = {
+        ok: true,
+        json: vi.fn().mockResolvedValue([
+          {
+            code: 0,
+            value: null,
+          },
+        ]),
+      };
+
+      mockFetch.mockResolvedValueOnce(createLoginResponse());
+      mockFetch.mockResolvedValueOnce(abilityResponse);
+
+      await client.login();
+      const caps = await detectCapabilities(client);
+
+      expect(caps).toEqual({});
+    });
+
+    it("should not include capabilities with falsy values", async () => {
+      const abilityResponse = {
+        ok: true,
+        json: vi.fn().mockResolvedValue([
+          {
+            code: 0,
+            value: {
+              Ptz: { ver: 1 },
+              FakeCap: false,
+              AnotherFake: null,
+            },
+          },
+        ]),
+      };
+
+      mockFetch.mockResolvedValueOnce(createLoginResponse());
+      mockFetch.mockResolvedValueOnce(abilityResponse);
+
+      await client.login();
+      const caps = await detectCapabilities(client);
+
+      expect(caps.ptz).toBe(true);
+      expect(caps).not.toHaveProperty("FakeCap");
+      expect(caps).not.toHaveProperty("AnotherFake");
+    });
   });
 
   describe("requireCapability", () => {
@@ -341,6 +451,104 @@ describe("Capabilities", () => {
       const hasPtz = await checkFeature(client, "ptz");
 
       expect(hasPtz).toBe(false);
+    });
+  });
+
+  describe("Integration scenarios", () => {
+    it("should detect capabilities, check feature, and require capability in workflow", async () => {
+      const abilityResponse = {
+        ok: true,
+        json: vi.fn().mockResolvedValue([
+          {
+            code: 0,
+            value: {
+              Ptz: { ver: 1 },
+              AI: { ver: 1 },
+              Md: { ver: 1 },
+            },
+          },
+        ]),
+      };
+
+      mockFetch.mockResolvedValueOnce(createLoginResponse());
+      mockFetch.mockResolvedValueOnce(abilityResponse);
+
+      await client.login();
+
+      // Detect all capabilities
+      const caps = await detectCapabilities(client);
+      expect(caps.ptz).toBe(true);
+      expect(caps.ai).toBe(true);
+      expect(caps.motionDetection).toBe(true);
+      expect(caps.recording).toBeUndefined();
+
+      // Require supported capability - should not throw
+      expect(() => requireCapability(caps, "ptz")).not.toThrow();
+
+      // Require unsupported capability - should throw
+      expect(() => requireCapability(caps, "recording")).toThrow();
+
+      // Check feature - should work without storing caps
+      mockFetch.mockResolvedValueOnce(abilityResponse);
+      const hasAI = await checkFeature(client, "ai");
+      expect(hasAI).toBe(true);
+    });
+
+    it("should gracefully handle devices with no capabilities", async () => {
+      const abilityResponse = {
+        ok: true,
+        json: vi.fn().mockResolvedValue([
+          {
+            code: 0,
+            value: {},
+          },
+        ]),
+      };
+
+      mockFetch.mockResolvedValueOnce(createLoginResponse());
+      mockFetch.mockResolvedValueOnce(abilityResponse);
+
+      await client.login();
+
+      const caps = await detectCapabilities(client);
+      expect(caps).toEqual({});
+
+      // All feature checks should return false
+      mockFetch.mockResolvedValueOnce(abilityResponse);
+      expect(await checkFeature(client, "ptz")).toBe(false);
+
+      // All require calls should throw
+      expect(() => requireCapability(caps, "ptz")).toThrow(
+        "Feature 'ptz' is not supported"
+      );
+    });
+
+    it("should handle mixed case capability keys consistently", async () => {
+      const abilityResponse = {
+        ok: true,
+        json: vi.fn().mockResolvedValue([
+          {
+            code: 0,
+            value: {
+              ptz: { ver: 1 },
+              AI: { ver: 1 },
+              Md: { ver: 1 },
+              rec: { ver: 1 },
+            },
+          },
+        ]),
+      };
+
+      mockFetch.mockResolvedValueOnce(createLoginResponse());
+      mockFetch.mockResolvedValueOnce(abilityResponse);
+
+      await client.login();
+
+      const caps = await detectCapabilities(client);
+      expect(caps.ptz).toBe(true);
+      expect(caps.ai).toBe(true);
+      expect(caps.motionDetection).toBe(true);
+      expect(caps.recording).toBe(true);
     });
   });
 });
