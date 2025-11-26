@@ -5,8 +5,7 @@
  * of the bash script reolink.sh
  */
 
-import https from "https";
-import { fetch as undiciFetch, Agent as UndiciAgent } from "undici";
+import { fetch as undiciFetch } from "undici";
 import {
   ReolinkRequest,
   ReolinkResponse,
@@ -19,6 +18,7 @@ import {
   ReolinkEventEmitterOptions,
 } from "./events.js";
 import { ReolinkPlaybackController } from "./playback.js";
+import { createFetchOptions } from "./utils/https-agent.js";
 
 interface LoginParams {
   User: {
@@ -57,7 +57,6 @@ export class ReolinkClient {
   private tokenExpiryTime: number = 0; // Timestamp when token expires
   private url: string;
   private fetchImpl: (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
-  private useUndiciFetch: boolean;
   private closed: boolean = false;
   private eventEmitters: Set<ReolinkEventEmitter> = new Set();
 
@@ -73,10 +72,8 @@ export class ReolinkClient {
     // Otherwise use the provided fetch or default to global fetch
     if (options.fetch) {
       this.fetchImpl = options.fetch;
-      this.useUndiciFetch = false;
     } else {
       this.fetchImpl = (this.insecure ? undiciFetch : fetch) as typeof fetch;
-      this.useUndiciFetch = this.insecure;
     }
     this.url = `${this.plain ? 'http' : 'https'}://${this.host}/cgi-bin/api.cgi`;
   }
@@ -134,32 +131,13 @@ export class ReolinkClient {
     }
 
     try {
-      const fetchOptions: RequestInit = {
+      const fetchOptions = createFetchOptions(this.insecure, this.fetchImpl, {
         method,
         headers: {
           "Content-Type": "application/json",
         },
         ...(method === "POST" && { body: JSON.stringify([request]) }),
-      };
-
-      // Create an HTTPS agent that ignores certificate errors (equivalent to curl -k)
-      if (this.insecure) {
-        if (this.useUndiciFetch) {
-          // Use undici's dispatcher for undici fetch
-          const dispatcher = new UndiciAgent({
-            connect: {
-              rejectUnauthorized: false,
-            },
-          });
-          (fetchOptions as { dispatcher?: UndiciAgent }).dispatcher = dispatcher;
-        } else {
-          // Use Node.js https agent for other fetch implementations
-          const agent = new https.Agent({
-            rejectUnauthorized: false,
-          });
-          (fetchOptions as { agent?: https.Agent }).agent = agent;
-        }
-      }
+      });
 
       const response = await this.fetchImpl(target, fetchOptions);
 
@@ -228,31 +206,13 @@ export class ReolinkClient {
       console.error(JSON.stringify(request, null, 2));
     }
 
-    const fetchOptions: RequestInit = {
+    const fetchOptions = createFetchOptions(this.insecure, this.fetchImpl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify([request]),
-    };
-
-    if (this.insecure) {
-      if (this.fetchImpl === undiciFetch) {
-        // Use undici's dispatcher for undici fetch
-        const dispatcher = new UndiciAgent({
-          connect: {
-            rejectUnauthorized: false,
-          },
-        });
-        (fetchOptions as { dispatcher?: UndiciAgent }).dispatcher = dispatcher;
-      } else {
-        // Use Node.js https agent for other fetch implementations
-        const agent = new https.Agent({
-          rejectUnauthorized: false,
-        });
-        (fetchOptions as { agent?: https.Agent }).agent = agent;
-      }
-    }
+    });
 
     const response = await this.fetchImpl(target, fetchOptions);
 
@@ -421,31 +381,13 @@ export class ReolinkClient {
       console.error(JSON.stringify(requests, null, 2));
     }
 
-    const fetchOptions: RequestInit = {
+    const fetchOptions = createFetchOptions(this.insecure, this.fetchImpl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(requests),
-    };
-
-    if (this.insecure) {
-      if (this.fetchImpl === undiciFetch) {
-        // Use undici's dispatcher for undici fetch
-        const dispatcher = new UndiciAgent({
-          connect: {
-            rejectUnauthorized: false,
-          },
-        });
-        (fetchOptions as { dispatcher?: UndiciAgent }).dispatcher = dispatcher;
-      } else {
-        // Use Node.js https agent for other fetch implementations
-        const agent = new https.Agent({
-          rejectUnauthorized: false,
-        });
-        (fetchOptions as { agent?: https.Agent }).agent = agent;
-      }
-    }
+    });
 
     const response = await this.fetchImpl(target, fetchOptions);
 

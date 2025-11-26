@@ -49,6 +49,10 @@
     "./endpoints/system": {
       "types": "./dist/endpoints/system.d.ts",
       "import": "./dist/endpoints/system.js"
+    },
+    "./utils/https-agent": {
+      "types": "./dist/utils/https-agent.d.ts",
+      "import": "./dist/utils/https-agent.js"
     }
   },
   "bin": {
