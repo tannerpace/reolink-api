@@ -259,6 +259,26 @@ export class ReolinkClient {
   }
 
   /**
+   * Check if an error is a token-related error that should trigger a retry
+   */
+  private isTokenError(error: ReolinkHttpError): boolean {
+    return (
+      error.code === 401 ||
+      error.rspCode === -1 || // Common invalid token code
+      error.detail.toLowerCase().includes("token") ||
+      error.detail.toLowerCase().includes("session")
+    );
+  }
+
+  /**
+   * Reset token state to force re-login on next request
+   */
+  private resetToken(): void {
+    this.token = "null";
+    this.tokenExpiryTime = 0;
+  }
+
+  /**
    * Wrapper for API calls that handles token refresh on 401/invalid token errors
    */
   private async withToken<T>(
@@ -283,23 +303,12 @@ export class ReolinkClient {
       return await this.apiInternal<T>(command, params, action, method);
     } catch (error) {
       // Check if it's a token-related error (401 or specific error codes)
-      if (error instanceof ReolinkHttpError) {
-        const isTokenError =
-          error.code === 401 ||
-          error.rspCode === -1 || // Common invalid token code
-          error.detail.toLowerCase().includes("token") ||
-          error.detail.toLowerCase().includes("session");
-
-        if (isTokenError && retryCount === 0) {
-          if (this.debug) {
-            console.error("Token error detected, re-logging in and retrying...");
-          }
-          // Force token refresh
-          this.token = "null";
-          this.tokenExpiryTime = 0;
-          // Retry once after re-login
-          return this.withToken<T>(command, params, action, retryCount + 1, method);
+      if (error instanceof ReolinkHttpError && this.isTokenError(error) && retryCount === 0) {
+        if (this.debug) {
+          console.error("Token error detected, re-logging in and retrying...");
         }
+        this.resetToken();
+        return this.withToken<T>(command, params, action, retryCount + 1, method);
       }
       throw error;
     }
@@ -433,23 +442,14 @@ export class ReolinkClient {
     try {
       return await this.apiInternalMany<T>(normalized);
     } catch (error) {
-      if (error instanceof ReolinkHttpError) {
-        const isTokenError =
-          error.code === 401 ||
-          error.rspCode === -1 ||
-          error.detail.toLowerCase().includes("token") ||
-          error.detail.toLowerCase().includes("session");
-
-        if (isTokenError && retryCount === 0) {
-          if (this.debug) {
-            console.error(
-              "Token error detected while processing batch, re-logging in and retrying..."
-            );
-          }
-          this.token = "null";
-          this.tokenExpiryTime = 0;
-          return this.withTokenMany<T>(normalized, retryCount + 1);
+      if (error instanceof ReolinkHttpError && this.isTokenError(error) && retryCount === 0) {
+        if (this.debug) {
+          console.error(
+            "Token error detected while processing batch, re-logging in and retrying..."
+          );
         }
+        this.resetToken();
+        return this.withTokenMany<T>(normalized, retryCount + 1);
       }
       throw error;
     }
