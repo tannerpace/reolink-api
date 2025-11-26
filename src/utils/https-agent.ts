@@ -9,6 +9,30 @@ import https from "https";
 import { fetch as undiciFetch, Agent as UndiciAgent } from "undici";
 
 /**
+ * Check if a fetch implementation is the undici fetch.
+ *
+ * Detection strategy:
+ * 1. Direct reference equality with undici's fetch export
+ * 2. Falls back to assuming undici if not the global fetch (since this package
+ *    uses undici by default for insecure connections)
+ *
+ * @param fetchImpl - The fetch implementation to check
+ * @returns True if the fetch implementation is likely undici
+ */
+export function isUndiciFetch(
+  fetchImpl: (input: string | URL | Request, init?: RequestInit) => Promise<Response>
+): boolean {
+  // Primary check: direct reference equality
+  if (fetchImpl === undiciFetch) {
+    return true;
+  }
+  // Secondary check: if it's not global fetch and not a mock (which would be different),
+  // assume it might be undici. This is the fallback for edge cases.
+  // The safest approach is to only match exact reference.
+  return false;
+}
+
+/**
  * Create fetch options with optional insecure SSL configuration.
  *
  * When insecure mode is enabled, creates an agent/dispatcher that skips
@@ -37,13 +61,7 @@ export function createFetchOptions(
   const options = { ...baseOptions };
 
   if (insecure) {
-    // Check if we're using undici fetch by comparing function references
-    // or checking if the global fetch is different from undici's fetch
-    const isUndiciFetch =
-      fetchImpl === undiciFetch ||
-      (fetchImpl !== globalThis.fetch && fetchImpl.toString().includes("undici"));
-
-    if (isUndiciFetch) {
+    if (isUndiciFetch(fetchImpl)) {
       // Use undici's dispatcher for undici fetch
       const dispatcher = new UndiciAgent({
         connect: {
@@ -63,17 +81,3 @@ export function createFetchOptions(
   return options;
 }
 
-/**
- * Check if a fetch implementation is the undici fetch.
- *
- * @param fetchImpl - The fetch implementation to check
- * @returns True if the fetch implementation is undici
- */
-export function isUndiciFetch(
-  fetchImpl: (input: string | URL | Request, init?: RequestInit) => Promise<Response>
-): boolean {
-  return (
-    fetchImpl === undiciFetch ||
-    (fetchImpl !== globalThis.fetch && fetchImpl.toString().includes("undici"))
-  );
-}

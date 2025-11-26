@@ -259,15 +259,24 @@ export class ReolinkClient {
   }
 
   /**
-   * Check if an error is a token-related error that should trigger a retry
+   * Check if an error is a token-related error that should trigger a retry.
+   * 
+   * Detection strategy (in order of reliability):
+   * 1. HTTP 401 status code - standard unauthorized
+   * 2. rspCode -1 - Reolink's common invalid token response code
+   * 3. String matching on error detail - fallback for device-specific messages
+   * 
+   * The string matching is intentionally broad to handle various error messages
+   * from different Reolink device firmware versions.
    */
   private isTokenError(error: ReolinkHttpError): boolean {
-    return (
-      error.code === 401 ||
-      error.rspCode === -1 || // Common invalid token code
-      error.detail.toLowerCase().includes("token") ||
-      error.detail.toLowerCase().includes("session")
-    );
+    // Primary checks: specific error codes
+    if (error.code === 401 || error.rspCode === -1) {
+      return true;
+    }
+    // Secondary check: error message content (fallback for device-specific messages)
+    const detail = error.detail.toLowerCase();
+    return detail.includes("token") || detail.includes("session");
   }
 
   /**
