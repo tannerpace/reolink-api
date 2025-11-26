@@ -5,19 +5,19 @@
  * of the bash script reolink.sh
  */
 
-import { fetch as undiciFetch } from "undici";
-import {
-  ReolinkRequest,
-  ReolinkResponse,
-  ReolinkResponseError,
-  ReolinkHttpError,
-  ReolinkToken,
-} from "./types.js";
+import { RequestInit, Response, fetch as undiciFetch } from "undici";
 import {
   ReolinkEventEmitter,
   ReolinkEventEmitterOptions,
 } from "./events.js";
 import { ReolinkPlaybackController } from "./playback.js";
+import {
+  ReolinkHttpError,
+  ReolinkRequest,
+  ReolinkResponse,
+  ReolinkResponseError,
+  ReolinkToken,
+} from "./types.js";
 import { createFetchOptions } from "./utils/https-agent.js";
 
 interface LoginParams {
@@ -41,7 +41,7 @@ export interface ReolinkOptions {
   insecure?: boolean;
   plain?: boolean;
   debug?: boolean;
-  fetch?: typeof fetch;
+  fetch?: (input: string | URL | globalThis.Request, init?: RequestInit) => Promise<Response>;
 }
 
 export class ReolinkClient {
